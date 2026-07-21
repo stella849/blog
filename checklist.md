@@ -16,8 +16,8 @@
 
 ## 보안 — 비밀번호 평문 저장 0건
 - [ ] Supabase 대시보드 Authentication > Users 메뉴에서 가입한 계정이 보이는지, 비밀번호 원문이 어디에도 노출되지 않는지 확인 (Supabase Auth가 자동 해시 저장)
-- [ ] Supabase URL/anon key가 `js/config.js`(또는 `.env`)에 있고 코드에 하드코딩되어 있지 않은지 확인
-- [ ] `js/config.js`가 `.gitignore`에 포함되어 GitHub에 올라가지 않는지 확인
+- [ ] Supabase URL/anon(publishable) key가 `js/config.js` 한 곳에만 있고 다른 코드에 하드코딩되어 있지 않은지 확인
+- [ ] `service_role` 키(관리자용 비밀 키)는 어떤 파일에도 없는지 확인 — publishable key와 달리 이건 절대 커밋 금지
 
 ## 권한(인가) — 타인 글 수정·삭제 100% 차단
 - [ ] 계정 A로 글 작성 → 계정 B로 로그인 후 A의 글 `/posts/:id/edit`에 URL로 직접 접근 시 거부되는지 확인
