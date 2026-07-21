@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>회원가입 — 블로그</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links"><a href="index.html">홈</a></nav>
+  </div>
+</header>
+
+<main class="container mt-lg" style="max-width: 420px;">
+  <h1>회원가입</h1>
+  <form id="signup-form" class="card stack">
+    <div class="form-group">
+      <label for="nickname">닉네임</label>
+      <input type="text" id="nickname" required maxlength="50" />
+    </div>
+    <div class="form-group">
+      <label for="email">이메일</label>
+      <input type="email" id="email" required />
+    </div>
+    <div class="form-group">
+      <label for="password">비밀번호</label>
+      <input type="password" id="password" required minlength="6" />
+    </div>
+    <div id="error" class="form-error" style="display:none;"></div>
+    <button type="submit" class="btn btn-primary">가입하기</button>
+  </form>
+  <p class="muted mt-lg">이미 계정이 있으신가요? <a href="login.html">로그인</a></p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script>
+document.getElementById("signup-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById("error");
+  errorEl.style.display = "none";
+
+  const nickname = document.getElementById("nickname").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: { data: { nickname } },
+  });
+
+  if (error) {
+    errorEl.textContent = error.message.includes("already registered")
+      ? "이미 가입된 이메일입니다."
+      : error.message;
+    errorEl.style.display = "block";
+    return;
+  }
+
+  window.location.href = "index.html";
+});
+</script>
+</body>
+</html>

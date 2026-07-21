@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>게시글 — 블로그</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links">
+      <a href="index.html">홈</a>
+      <a href="post-new.html" class="auth-only" style="display:none">글쓰기</a>
+      <a href="mypage.html" class="auth-only" style="display:none">마이페이지</a>
+      <a href="admin.html" class="admin-only" style="display:none">관리자</a>
+      <a href="login.html" class="guest-only btn-utility" style="display:none">로그인</a>
+      <a href="signup.html" class="guest-only" style="display:none">회원가입</a>
+      <button id="logout-btn" class="btn-utility auth-only" style="display:none">로그아웃</button>
+    </nav>
+  </div>
+</header>
+
+<main class="container mt-lg" style="max-width: 720px;">
+  <div id="post" class="card"><p class="muted">불러오는 중...</p></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/util.js"></script>
+<script>
+const id = new URLSearchParams(window.location.search).get("id");
+
+async function loadPost() {
+  const el = document.getElementById("post");
+  if (!id) {
+    el.innerHTML = `<p class="form-error">잘못된 요청입니다.</p>`;
+    return;
+  }
+
+  const { data: post, error } = await supabaseClient
+    .from("posts")
+    .select("id, title, content, thumbnail_image, attachment_url, attachment_name, view_count, created_at, user_id, profiles(nickname), categories(name)")
+    .eq("id", id)
+    .single();
+
+  if (error || !post) {
+    el.innerHTML = `<p class="form-error">게시글을 찾을 수 없습니다.</p>`;
+    return;
+  }
+
+  // 조회수 +1 (실패해도 화면 표시에는 영향 없음)
+  supabaseClient.from("posts").update({ view_count: post.view_count + 1 }).eq("id", id).then(() => {});
+
+  const { data: tagRows } = await supabaseClient.from("post_tags").select("tags(name)").eq("post_id", id);
+  const tagNames = (tagRows || []).map((t) => t.tags?.name).filter(Boolean);
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const admin = await isAdmin(session);
+  const canManage = session && (session.user.id === post.user_id || admin);
+
+  el.innerHTML = `
+    ${post.thumbnail_image ? `<img src="${escapeHtml(post.thumbnail_image)}" alt="" style="width:100%;border-radius:var(--radius-lg);margin-bottom:var(--space-md);" />` : ""}
+    <h1>${escapeHtml(post.title)}</h1>
+    <div class="meta muted">
+      ${escapeHtml(post.profiles?.nickname ?? "알 수 없음")} · ${new Date(post.created_at).toLocaleString("ko-KR")}
+      ${post.categories?.name ? " · " + escapeHtml(post.categories.name) : ""} · 조회 ${post.view_count + 1}
+    </div>
+    <div class="badge-list">${tagNames.map((t) => `<span class="badge-pill">#${escapeHtml(t)}</span>`).join("")}</div>
+    <hr class="hairline-divider" />
+    <div id="content-body" style="white-space: pre-wrap;">${escapeHtml(post.content)}</div>
+    ${post.attachment_url ? `
+      <hr class="hairline-divider" />
+      <a href="${escapeHtml(post.attachment_url)}" target="_blank" rel="noopener" class="btn-utility">📎 ${escapeHtml(post.attachment_name || "첨부파일")} 다운로드</a>
+    ` : ""}
+    ${canManage ? `
+      <hr class="hairline-divider" />
+      <div class="row">
+        <a href="post-edit.html?id=${post.id}" class="btn btn-secondary">수정</a>
+        <button id="delete-btn" class="btn btn-danger">삭제</button>
+      </div>
+    ` : ""}
+  `;
+
+  if (canManage) {
+    document.getElementById("delete-btn").addEventListener("click", async () => {
+      if (!confirm("정말 삭제하시겠습니까?")) return;
+      const { error: deleteError } = await supabaseClient.from("posts").delete().eq("id", id);
+      if (deleteError) {
+        alert("삭제에 실패했습니다: " + deleteError.message);
+        return;
+      }
+      window.location.href = "index.html";
+    });
+  }
+}
+
+(async () => {
+  await initNav();
+  await loadPost();
+})();
+</script>
+</body>
+</html>

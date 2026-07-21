@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>블로그 — 홈</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links">
+      <a href="index.html">홈</a>
+      <a href="post-new.html" class="auth-only" style="display:none">글쓰기</a>
+      <a href="mypage.html" class="auth-only" style="display:none">마이페이지</a>
+      <a href="admin.html" class="admin-only" style="display:none">관리자</a>
+      <a href="login.html" class="guest-only btn-utility" style="display:none">로그인</a>
+      <a href="signup.html" class="guest-only" style="display:none">회원가입</a>
+      <button id="logout-btn" class="btn-utility auth-only" style="display:none">로그아웃</button>
+    </nav>
+  </div>
+</header>
+
+<main class="container mt-lg">
+  <div class="row-between">
+    <h1 id="page-title">전체 글</h1>
+    <div id="category-filter" class="badge-list"></div>
+  </div>
+
+  <div id="post-list" class="stack mt-lg">
+    <p class="muted">불러오는 중...</p>
+  </div>
+
+  <div class="row" id="pagination" style="justify-content:center; margin-top: var(--space-xl);"></div>
+</main>
+
+<footer class="footer">
+  <div class="container">블로그 CRUD 프로젝트 — AI빌더스쿨 과제</div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/util.js"></script>
+<script>
+const PAGE_SIZE = 10;
+const params = new URLSearchParams(window.location.search);
+const categoryId = params.get("category");
+const tagId = params.get("tag");
+const page = parseInt(params.get("page") || "1", 10);
+
+async function loadCategories() {
+  const { data: categories } = await supabaseClient.from("categories").select("id, name").order("name");
+  const el = document.getElementById("category-filter");
+  el.innerHTML = "";
+  const allPill = document.createElement("a");
+  allPill.href = "index.html";
+  allPill.className = "badge-pill" + (!categoryId ? " active" : "");
+  allPill.textContent = "전체";
+  el.appendChild(allPill);
+  (categories || []).forEach((c) => {
+    const pill = document.createElement("a");
+    pill.href = `index.html?category=${c.id}`;
+    pill.className = "badge-pill" + (String(categoryId) === String(c.id) ? " active" : "");
+    pill.textContent = c.name;
+    el.appendChild(pill);
+  });
+}
+
+// 카테고리 이름을 장식용 accent 컬러에 매핑 (Notion 스티커 팔레트 — 구조색과 별개, 장식용)
+// 알려진 카테고리는 고정 배정(항상 서로 다른 색), 새로 추가된 카테고리는 해시로 자동 배정
+const ACCENT_COLORS = ["accent-sky", "accent-purple", "accent-pink", "accent-orange", "accent-teal", "accent-green"];
+const CATEGORY_ACCENT_MAP = {
+  "바이브코딩": "accent-sky",
+  "일기": "accent-purple",
+  "식단": "accent-teal",
+  "건강": "accent-green",
+  "운동": "accent-orange",
+};
+function categoryAccent(name) {
+  if (!name) return ACCENT_COLORS[0];
+  if (CATEGORY_ACCENT_MAP[name]) return CATEGORY_ACCENT_MAP[name];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return ACCENT_COLORS[hash % ACCENT_COLORS.length];
+}
+
+function excerpt(html, len = 90) {
+  const text = html.replace(/<[^>]*>/g, "");
+  return text.length > len ? text.slice(0, len) + "…" : text;
+}
+
+async function loadPosts() {
+  const listEl = document.getElementById("post-list");
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  let query = supabaseClient
+    .from("posts")
+    .select("id, title, content, thumbnail_image, view_count, created_at, category_id, profiles(nickname), categories(name)", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (categoryId) query = query.eq("category_id", categoryId);
+
+  if (tagId) {
+    const { data: postTagRows } = await supabaseClient.from("post_tags").select("post_id").eq("tag_id", tagId);
+    const ids = (postTagRows || []).map((r) => r.post_id);
+    query = query.in("id", ids.length ? ids : [-1]);
+  }
+
+  const { data: posts, count, error } = await query;
+
+  if (error) {
+    listEl.innerHTML = `<p class="form-error">목록을 불러오지 못했습니다: ${error.message}</p>`;
+    return;
+  }
+
+  if (!posts || posts.length === 0) {
+    listEl.innerHTML = `<div class="empty-state">아직 작성된 글이 없습니다. <a href="post-new.html">첫 글을 써보세요</a>.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = "";
+  posts.forEach((post) => {
+    const card = document.createElement("a");
+    card.href = `post-detail.html?id=${post.id}`;
+    card.className = "post-card";
+
+    const media = post.thumbnail_image
+      ? `<img class="post-card-thumb" src="${escapeHtml(post.thumbnail_image)}" alt="" />`
+      : `<div class="post-card-avatar" style="--accent: var(--color-${categoryAccent(post.categories?.name)});">${escapeHtml((post.categories?.name || post.title || "?").charAt(0))}</div>`;
+
+    card.innerHTML = `
+      ${media}
+      <div class="post-card-body">
+        <h3>${escapeHtml(post.title)}</h3>
+        <div class="excerpt">${escapeHtml(excerpt(post.content))}</div>
+        <div class="meta">
+          ${escapeHtml(post.profiles?.nickname ?? "알 수 없음")} · ${new Date(post.created_at).toLocaleDateString("ko-KR")}
+          ${post.categories?.name ? " · " + escapeHtml(post.categories.name) : ""} · 조회 ${post.view_count}
+        </div>
+      </div>
+    `;
+    listEl.appendChild(card);
+  });
+
+  renderPagination(count || 0);
+}
+
+function renderPagination(total) {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const el = document.getElementById("pagination");
+  el.innerHTML = "";
+  for (let p = 1; p <= totalPages; p++) {
+    const qs = new URLSearchParams(window.location.search);
+    qs.set("page", p);
+    const a = document.createElement("a");
+    a.href = `index.html?${qs.toString()}`;
+    a.className = "btn-utility";
+    a.textContent = p;
+    if (p === page) a.style.borderColor = "var(--color-primary)";
+    el.appendChild(a);
+  }
+}
+
+(async () => {
+  await initNav();
+  await loadCategories();
+  await loadPosts();
+})();
+</script>
+</body>
+</html>

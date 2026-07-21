@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>글쓰기 — 블로그</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links">
+      <a href="index.html">홈</a>
+      <a href="mypage.html">마이페이지</a>
+      <a href="admin.html" class="admin-only" style="display:none">관리자</a>
+      <button id="logout-btn" class="btn-utility">로그아웃</button>
+    </nav>
+  </div>
+</header>
+
+<main class="container mt-lg" style="max-width: 640px;">
+  <h1>새 글 작성</h1>
+  <form id="post-form" class="card stack">
+    <div class="form-group">
+      <label for="published-at">작성일</label>
+      <input type="date" id="published-at" required />
+    </div>
+    <div class="form-group">
+      <label for="title">제목</label>
+      <input type="text" id="title" required maxlength="200" />
+    </div>
+    <div class="form-group">
+      <label for="category">카테고리</label>
+      <select id="category">
+        <option value="">미분류</option>
+      </select>
+      <input type="text" id="new-category" placeholder="목록에 없으면 새 카테고리 이름을 입력하세요" style="margin-top: var(--space-xs);" />
+    </div>
+    <div class="form-group">
+      <label for="media">이미지 또는 첨부파일</label>
+      <input type="file" id="media" />
+      <div class="muted" style="font-size: var(--text-caption-size); margin-top: var(--space-xxs);">이미지를 선택하면 대표 이미지로, 그 외 파일(PDF 등)은 첨부파일로 등록됩니다.</div>
+    </div>
+    <div class="form-group">
+      <label for="content">본문</label>
+      <textarea id="content" required></textarea>
+    </div>
+    <div class="form-group">
+      <label for="tags">태그 (쉼표로 구분, 예: 자바,스프링)</label>
+      <input type="text" id="tags" placeholder="자바, 스프링" />
+    </div>
+    <div id="error" class="form-error" style="display:none;"></div>
+    <button type="submit" class="btn btn-primary">게시하기</button>
+  </form>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
+<script>
+let session;
+
+async function loadCategories() {
+  const { data } = await supabaseClient.from("categories").select("id, name").order("name");
+  const select = document.getElementById("category");
+  (data || []).forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
+}
+
+// 미디어 파일 하나를 업로드하고, 이미지면 썸네일 자리에 / 그 외엔 첨부파일 자리에 담아 반환
+async function uploadMedia(file, userId) {
+  const path = `${userId}/${Date.now()}-${file.name}`;
+  const { error } = await supabaseClient.storage.from("post-images").upload(path, file);
+  if (error) throw error;
+  const { data } = supabaseClient.storage.from("post-images").getPublicUrl(path);
+
+  if (file.type.startsWith("image/")) {
+    return { thumbnailUrl: data.publicUrl, attachmentUrl: null, attachmentName: null };
+  }
+  return { thumbnailUrl: null, attachmentUrl: data.publicUrl, attachmentName: file.name };
+}
+
+// 새 카테고리 이름을 받아 categories 테이블에 없으면 만들고 id를 반환
+async function resolveCategoryId(name) {
+  const { data: existing } = await supabaseClient.from("categories").select("id").eq("name", name).maybeSingle();
+  if (existing) return existing.id;
+  const { data: created, error } = await supabaseClient.from("categories").insert({ name }).select("id").single();
+  if (error) throw error;
+  return created.id;
+}
+
+// 태그 문자열을 받아 tags 테이블에 없으면 만들고, 전체 tag id 배열을 반환
+async function resolveTagIds(tagNames) {
+  const ids = [];
+  for (const name of tagNames) {
+    const { data: existing } = await supabaseClient.from("tags").select("id").eq("name", name).maybeSingle();
+    if (existing) {
+      ids.push(existing.id);
+    } else {
+      const { data: created, error } = await supabaseClient.from("tags").insert({ name }).select("id").single();
+      if (error) throw error;
+      ids.push(created.id);
+    }
+  }
+  return ids;
+}
+
+document.getElementById("post-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById("error");
+  errorEl.style.display = "none";
+
+  const title = document.getElementById("title").value.trim();
+  const content = document.getElementById("content").value.trim();
+  const newCategoryName = document.getElementById("new-category").value.trim();
+  let categoryId = document.getElementById("category").value || null;
+  const tagNames = document
+    .getElementById("tags")
+    .value.split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const mediaFile = document.getElementById("media").files[0];
+  const publishedAt = document.getElementById("published-at").value;
+
+  try {
+    if (newCategoryName) categoryId = await resolveCategoryId(newCategoryName);
+
+    let media = { thumbnailUrl: null, attachmentUrl: null, attachmentName: null };
+    if (mediaFile) media = await uploadMedia(mediaFile, session.user.id);
+
+    const { data: post, error: insertError } = await supabaseClient
+      .from("posts")
+      .insert({
+        user_id: session.user.id,
+        category_id: categoryId,
+        title,
+        content,
+        thumbnail_image: media.thumbnailUrl,
+        attachment_url: media.attachmentUrl,
+        attachment_name: media.attachmentName,
+        created_at: publishedAt,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (tagNames.length) {
+      const tagIds = await resolveTagIds(tagNames);
+      await supabaseClient.from("post_tags").insert(tagIds.map((tagId) => ({ post_id: post.id, tag_id: tagId })));
+    }
+
+    window.location.href = `post-detail.html?id=${post.id}`;
+  } catch (err) {
+    errorEl.textContent = "저장에 실패했습니다: " + err.message;
+    errorEl.style.display = "block";
+  }
+});
+
+(async () => {
+  session = await requireAuth();
+  if (!session) return;
+  await initNav();
+  await loadCategories();
+  document.getElementById("published-at").value = new Date().toISOString().slice(0, 10);
+})();
+</script>
+</body>
+</html>

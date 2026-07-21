@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>프로필 수정 — 블로그</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links">
+      <a href="index.html">홈</a>
+      <a href="mypage.html">마이페이지</a>
+      <a href="admin.html" class="admin-only" style="display:none">관리자</a>
+      <button id="logout-btn" class="btn-utility">로그아웃</button>
+    </nav>
+  </div>
+</header>
+
+<main class="container mt-lg" style="max-width: 420px;">
+  <h1>프로필 수정</h1>
+  <form id="profile-form" class="card stack">
+    <div class="form-group">
+      <label for="nickname">닉네임</label>
+      <input type="text" id="nickname" required maxlength="50" />
+    </div>
+    <div class="form-group">
+      <label for="profile-image">프로필 이미지 (교체 시에만 선택)</label>
+      <input type="file" id="profile-image" accept="image/*" />
+    </div>
+    <div id="error" class="form-error" style="display:none;"></div>
+    <button type="submit" class="btn btn-primary">저장</button>
+  </form>
+
+  <h2 class="mt-lg">비밀번호 변경</h2>
+  <form id="password-form" class="card stack">
+    <div class="form-group">
+      <label for="new-password">새 비밀번호</label>
+      <input type="password" id="new-password" required minlength="6" />
+    </div>
+    <div class="form-group">
+      <label for="new-password2">새 비밀번호 확인</label>
+      <input type="password" id="new-password2" required minlength="6" />
+    </div>
+    <div id="password-error" class="form-error" style="display:none;"></div>
+    <div id="password-success" class="muted" style="display:none;">비밀번호가 변경되었습니다.</div>
+    <button type="submit" class="btn btn-secondary">비밀번호 변경하기</button>
+  </form>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
+<script>
+let session;
+let currentImage = null;
+
+async function loadProfile() {
+  const { data: profile } = await supabaseClient
+    .from("profiles")
+    .select("nickname, profile_image")
+    .eq("id", session.user.id)
+    .single();
+
+  document.getElementById("nickname").value = profile?.nickname ?? "";
+  currentImage = profile?.profile_image ?? null;
+}
+
+async function uploadProfileImage(file, userId) {
+  const path = `${userId}/profile-${Date.now()}-${file.name}`;
+  const { error } = await supabaseClient.storage.from("post-images").upload(path, file);
+  if (error) throw error;
+  const { data } = supabaseClient.storage.from("post-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+document.getElementById("profile-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById("error");
+  errorEl.style.display = "none";
+
+  const nickname = document.getElementById("nickname").value.trim();
+  const file = document.getElementById("profile-image").files[0];
+
+  try {
+    let imageUrl = currentImage;
+    if (file) imageUrl = await uploadProfileImage(file, session.user.id);
+
+    const { error: updateError } = await supabaseClient
+      .from("profiles")
+      .update({ nickname, profile_image: imageUrl })
+      .eq("id", session.user.id);
+
+    if (updateError) throw updateError;
+
+    window.location.href = "mypage.html";
+  } catch (err) {
+    errorEl.textContent = "저장에 실패했습니다: " + err.message;
+    errorEl.style.display = "block";
+  }
+});
+
+document.getElementById("password-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById("password-error");
+  const successEl = document.getElementById("password-success");
+  errorEl.style.display = "none";
+  successEl.style.display = "none";
+
+  const newPassword = document.getElementById("new-password").value;
+  const newPassword2 = document.getElementById("new-password2").value;
+
+  if (newPassword !== newPassword2) {
+    errorEl.textContent = "비밀번호가 서로 일치하지 않습니다.";
+    errorEl.style.display = "block";
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("password-form").reset();
+  successEl.style.display = "block";
+});
+
+(async () => {
+  session = await requireAuth();
+  if (!session) return;
+  await initNav();
+  await loadProfile();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>로그인 — 블로그</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links"><a href="index.html">홈</a></nav>
+  </div>
+</header>
+
+<main class="container mt-lg" style="max-width: 420px;">
+  <h1>로그인</h1>
+  <form id="login-form" class="card stack">
+    <div class="form-group">
+      <label for="email">이메일</label>
+      <input type="email" id="email" required />
+    </div>
+    <div class="form-group">
+      <label for="password">비밀번호</label>
+      <input type="password" id="password" required />
+    </div>
+    <div id="error" class="form-error" style="display:none;"></div>
+    <button type="submit" class="btn btn-primary">로그인</button>
+  </form>
+  <p class="muted mt-lg">
+    계정이 없으신가요? <a href="signup.html">회원가입</a><br />
+    비밀번호를 잊으셨나요? <a href="forgot-password.html">비밀번호 재설정</a>
+  </p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script>
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById("error");
+  errorEl.style.display = "none";
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    if (error.message.includes("Email not confirmed")) {
+      errorEl.textContent = "이메일 인증이 필요합니다. 가입 시 받은 인증 메일의 링크를 먼저 클릭해주세요.";
+    } else if (error.message.includes("Invalid login credentials")) {
+      errorEl.textContent = "이메일 또는 비밀번호가 올바르지 않습니다.";
+    } else {
+      errorEl.textContent = error.message;
+    }
+    errorEl.style.display = "block";
+    return;
+  }
+
+  window.location.href = "index.html";
+});
+</script>
+</body>
+</html>

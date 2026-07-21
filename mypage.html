@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>마이페이지 — 블로그</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="nav-bar">
+  <div class="container">
+    <a href="index.html" class="brand">My Blog</a>
+    <nav class="nav-links">
+      <a href="index.html">홈</a>
+      <a href="post-new.html">글쓰기</a>
+      <a href="admin.html" class="admin-only" style="display:none">관리자</a>
+      <button id="logout-btn" class="btn-utility">로그아웃</button>
+    </nav>
+  </div>
+</header>
+
+<main class="container mt-lg" style="max-width: 640px;">
+  <div id="profile-card" class="card row-between">
+    <p class="muted">불러오는 중...</p>
+  </div>
+
+  <h2 class="mt-lg">내가 쓴 글</h2>
+  <div id="my-posts" class="stack"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/util.js"></script>
+<script>
+let session;
+
+async function loadProfile() {
+  const { data: profile } = await supabaseClient
+    .from("profiles")
+    .select("nickname, profile_image")
+    .eq("id", session.user.id)
+    .single();
+
+  document.getElementById("profile-card").innerHTML = `
+    <div class="row">
+      ${profile?.profile_image ? `<img src="${escapeHtml(profile.profile_image)}" alt="" style="width:48px;height:48px;border-radius:var(--radius-full);object-fit:cover;" />` : ""}
+      <div>
+        <div style="font-weight:700;">${escapeHtml(profile?.nickname ?? "")}</div>
+        <div class="muted" style="font-size: var(--text-caption-size);">${escapeHtml(session.user.email)}</div>
+      </div>
+    </div>
+    <a href="mypage-edit.html" class="btn-utility">프로필 수정</a>
+  `;
+}
+
+async function loadMyPosts() {
+  const el = document.getElementById("my-posts");
+  const { data: posts, error } = await supabaseClient
+    .from("posts")
+    .select("id, title, created_at, view_count")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    el.innerHTML = `<p class="form-error">불러오지 못했습니다: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  if (!posts || posts.length === 0) {
+    el.innerHTML = `<div class="empty-state">아직 쓴 글이 없습니다. <a href="post-new.html">첫 글을 써보세요</a>.</div>`;
+    return;
+  }
+
+  el.innerHTML = "";
+  posts.forEach((post) => {
+    const row = document.createElement("div");
+    row.className = "card row-between";
+    row.innerHTML = `
+      <div>
+        <a href="post-detail.html?id=${post.id}"><strong>${escapeHtml(post.title)}</strong></a>
+        <div class="meta muted">${new Date(post.created_at).toLocaleDateString("ko-KR")} · 조회 ${post.view_count}</div>
+      </div>
+      <div class="row">
+        <a href="post-edit.html?id=${post.id}" class="btn-utility">수정</a>
+        <button class="btn-utility delete-btn" data-id="${post.id}">삭제</button>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+
+  el.querySelectorAll(".delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("정말 삭제하시겠습니까?")) return;
+      const { error: deleteError } = await supabaseClient.from("posts").delete().eq("id", btn.dataset.id);
+      if (deleteError) {
+        alert("삭제에 실패했습니다: " + deleteError.message);
+        return;
+      }
+      loadMyPosts();
+    });
+  });
+}
+
+(async () => {
+  session = await requireAuth();
+  if (!session) return;
+  await initNav();
+  await loadProfile();
+  await loadMyPosts();
+})();
+</script>
+</body>
+</html>
