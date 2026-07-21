@@ -273,6 +273,17 @@ a:hover { text-decoration: underline; }
   color: var(--color-on-primary);
   border-color: var(--color-primary);
 }
+
+/* 카테고리 필터 알약 앞의 작은 색상 점 — 알약 배경은 뉴트럴하게 유지하고, 카테고리 구분만 점 하나로 */
+.pill-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--accent);
+}
 .badge-list { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin: var(--space-xs) 0; }
 
 /* Forms */

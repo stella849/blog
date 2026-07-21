@@ -65,7 +65,7 @@ async function loadCategories() {
     const pill = document.createElement("a");
     pill.href = `index.html?category=${c.id}`;
     pill.className = "badge-pill" + (String(categoryId) === String(c.id) ? " active" : "");
-    pill.textContent = c.name;
+    pill.innerHTML = `<span class="pill-dot" style="--accent: var(--color-${categoryAccent(c.name)});"></span>${escapeHtml(c.name)}`;
     el.appendChild(pill);
   });
 }
