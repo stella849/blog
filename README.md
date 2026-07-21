@@ -10,7 +10,7 @@
 
 2. **Supabase 설정값 확인**
    `js/config.js`에 이미 프로젝트 URL과 publishable(anon) key가 채워져 있습니다. 다른 Supabase 프로젝트를 쓰려면 이 값만 바꾸면 됩니다.
-   (이 파일은 `.gitignore`에 포함되어 있어 GitHub에는 올라가지 않습니다 — 새로 클론하는 사람은 `js/config.example.js`를 복사해서 채우세요.)
+   (publishable/anon key는 클라이언트에 노출돼도 안전하도록 설계된 키라 이 파일도 그대로 커밋·배포합니다 — `service_role` 키만 절대 커밋하면 안 됩니다.)
 
 3. **로컬 실행**
    VS Code에서 Live Server 확장으로 `index.html`을 열면 됩니다. (배포 없이 로컬 확인)
