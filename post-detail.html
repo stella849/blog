@@ -25,6 +25,12 @@
 
 <main class="container mt-lg" style="max-width: 720px;">
   <div id="post" class="card"><p class="muted">불러오는 중...</p></div>
+
+  <div class="card mt-lg">
+    <h3>댓글 <span id="comment-count" class="muted"></span></h3>
+    <div id="comment-list" class="stack mt-lg"><p class="muted">불러오는 중...</p></div>
+    <div id="comment-form-wrap" class="mt-lg"></div>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -99,9 +105,122 @@ async function loadPost() {
   }
 }
 
+async function loadComments() {
+  const listEl = document.getElementById("comment-list");
+
+  const { data: comments, error } = await supabaseClient
+    .from("comments")
+    .select("id, content, created_at, user_id, profiles(nickname)")
+    .eq("post_id", id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    listEl.innerHTML = `<p class="form-error">댓글을 불러오지 못했습니다: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  document.getElementById("comment-count").textContent = comments.length ? `(${comments.length})` : "";
+
+  if (!comments.length) {
+    listEl.innerHTML = `<p class="muted">아직 댓글이 없습니다.</p>`;
+    return;
+  }
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const admin = await isAdmin(session);
+
+  listEl.innerHTML = comments
+    .map((c) => {
+      const canDelete = session && (session.user.id === c.user_id || admin);
+      return `
+        <div class="comment-item">
+          <div class="comment-meta muted">${escapeHtml(c.profiles?.nickname ?? "알 수 없음")} · ${new Date(c.created_at).toLocaleString("ko-KR")}</div>
+          <div class="comment-content">${escapeHtml(c.content)}</div>
+          ${canDelete ? `<button class="btn-utility comment-delete-btn" data-comment-id="${c.id}">삭제</button>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  listEl.querySelectorAll(".comment-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("댓글을 삭제하시겠습니까?")) return;
+      const { error: deleteError } = await supabaseClient.from("comments").delete().eq("id", btn.dataset.commentId);
+      if (deleteError) {
+        alert("삭제에 실패했습니다: " + deleteError.message);
+        return;
+      }
+      loadComments();
+    });
+  });
+}
+
+async function initCommentForm() {
+  const wrap = document.getElementById("comment-form-wrap");
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  if (!session) {
+    wrap.innerHTML = `<p class="muted">댓글을 작성하려면 <a href="login.html">로그인</a>하세요.</p>`;
+    return;
+  }
+
+  const emojis = ["😀", "😂", "😍", "👍", "👏", "🎉", "😢", "🙏", "🔥", "💪"];
+
+  wrap.innerHTML = `
+    <form id="comment-form" class="stack">
+      <div class="comment-emoji-picker">
+        ${emojis.map((e) => `<button type="button" class="emoji-btn">${e}</button>`).join("")}
+      </div>
+      <textarea id="comment-content" class="comment-textarea" placeholder="댓글을 남겨보세요" required></textarea>
+      <div id="comment-error" class="form-error" style="display:none;"></div>
+      <button type="submit" class="btn btn-primary" style="align-self:flex-start;">댓글 등록</button>
+    </form>
+  `;
+
+  const commentTextarea = document.getElementById("comment-content");
+  wrap.querySelectorAll(".emoji-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const start = commentTextarea.selectionStart;
+      const end = commentTextarea.selectionEnd;
+      const emoji = btn.textContent;
+      commentTextarea.value = commentTextarea.value.slice(0, start) + emoji + commentTextarea.value.slice(end);
+      const cursor = start + emoji.length;
+      commentTextarea.focus();
+      commentTextarea.setSelectionRange(cursor, cursor);
+    });
+  });
+
+  document.getElementById("comment-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("comment-error");
+    errorEl.style.display = "none";
+
+    const contentEl = document.getElementById("comment-content");
+    const content = contentEl.value.trim();
+    if (!content) return;
+
+    const { error } = await supabaseClient.from("comments").insert({
+      post_id: id,
+      user_id: session.user.id,
+      content,
+    });
+
+    if (error) {
+      errorEl.textContent = "등록에 실패했습니다: " + error.message;
+      errorEl.style.display = "block";
+      return;
+    }
+
+    contentEl.value = "";
+    await loadComments();
+  });
+}
+
 (async () => {
   await initNav();
   await loadPost();
+  await loadComments();
+  await initCommentForm();
 })();
 </script>
 </body>

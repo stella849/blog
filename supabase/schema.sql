@@ -69,9 +69,19 @@ create table post_tags (
   primary key (post_id, tag_id)
 );
 
+-- comments (댓글)
+create table comments (
+  id bigint generated always as identity primary key,
+  post_id bigint not null references posts(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
 create index idx_posts_user_id on posts(user_id);
 create index idx_posts_category_id on posts(category_id);
 create index idx_posts_created_at on posts(created_at desc);
+create index idx_comments_post_id on comments(post_id);
 
 -- ── Row Level Security ──
 -- prd.md FR-4 AC-4.2: 본인 글만 수정·삭제 가능 — auth.uid() 기준으로 서버(DB) 단에서 실제로 강제된다.
@@ -80,6 +90,7 @@ alter table posts enable row level security;
 alter table categories enable row level security;
 alter table tags enable row level security;
 alter table post_tags enable row level security;
+alter table comments enable row level security;
 
 -- 전체 공개 읽기 (방문자도 목록/상세/프로필 열람 가능)
 create policy "profiles are publicly readable" on profiles for select using (true);
@@ -107,6 +118,33 @@ create policy "logged-in users can insert own posts" on posts for insert
 create policy "owners can update own posts" on posts for update
   using (auth.uid() = user_id);
 create policy "owners can delete own posts" on posts for delete
+  using (auth.uid() = user_id);
+
+-- 댓글 읽기: 게시글과 동일한 공개 범위를 따름(비공개 카테고리 글의 댓글은 작성자 본인만)
+create policy "comments are readable respecting post visibility" on comments
+  for select using (
+    exists (
+      select 1 from posts p
+      left join categories c on c.id = p.category_id
+      where p.id = comments.post_id
+        and (c.is_private is not true or auth.uid() = p.user_id)
+    )
+  );
+
+-- 로그인한 사용자만 댓글 작성 가능, 작성자 본인 명의로만 + 열람 가능한 글에만
+create policy "logged-in users can insert own comments" on comments for insert
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from posts p
+      left join categories c on c.id = p.category_id
+      where p.id = comments.post_id
+        and (c.is_private is not true or auth.uid() = p.user_id)
+    )
+  );
+
+-- 본인 댓글만 삭제 가능
+create policy "owners can delete own comments" on comments for delete
   using (auth.uid() = user_id);
 
 -- 카테고리/태그/연결 테이블은 로그인한 사용자면 누구나 추가 가능(과제 범위 — 관리 화면 없음)
@@ -144,6 +182,9 @@ create policy "admins can delete categories" on categories for delete using (pub
 
 -- 관리자는 다른 회원의 role을 변경 가능 (관리자 지정/해제)
 create policy "admins can update any profile" on profiles for update using (public.is_admin());
+
+-- 관리자는 모든 댓글을 삭제 가능
+create policy "admins can delete any comment" on comments for delete using (public.is_admin());
 
 -- ── Storage: 게시글 대표 이미지 ──
 insert into storage.buckets (id, name, public)

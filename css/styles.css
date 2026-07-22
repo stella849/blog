@@ -293,6 +293,24 @@ a:hover { text-decoration: underline; }
 }
 .badge-list { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin: var(--space-xs) 0; }
 
+/* Comments */
+.comment-item { padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-hairline); }
+.comment-item:last-child { border-bottom: none; }
+.comment-meta { font-size: var(--text-caption-size); margin-bottom: var(--space-xxs); }
+.comment-content { font-size: var(--text-body-sm-size); white-space: pre-wrap; margin-bottom: var(--space-xs); }
+.comment-textarea { min-height: 80px; }
+.comment-emoji-picker { display: flex; gap: 2px; flex-wrap: wrap; }
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+.emoji-btn:hover { background: var(--color-canvas-soft); }
+
 /* Forms */
 .form-group { margin-bottom: var(--space-md); }
 .form-group label {
