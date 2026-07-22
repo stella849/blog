@@ -263,34 +263,25 @@ a:hover { text-decoration: underline; }
 }
 
 /* Badges / pills */
+/* --accent가 설정된 알약(카테고리 필터)은 카테고리별 파스텔 배경으로 구분됨 — 미설정 시 중립 회색으로 대체 */
 .badge-pill {
   display: inline-block;
-  background: var(--color-surface);
-  color: var(--color-primary);
+  background: color-mix(in srgb, var(--accent, var(--color-ink-muted)) 18%, white);
+  color: color-mix(in srgb, var(--accent, var(--color-ink-muted)) 65%, black);
   font-size: var(--text-eyebrow-size);
   font-weight: 600;
   border-radius: var(--radius-full);
-  padding: 4px 8px;
-  border: 1px solid var(--color-hairline);
+  padding: 4px 10px;
+  border: 1px solid transparent;
   transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
 }
-.badge-pill:hover { text-decoration: none; border-color: var(--color-primary); }
+.badge-pill:hover { text-decoration: none; border-color: color-mix(in srgb, var(--accent, var(--color-primary)) 55%, transparent); }
 .badge-pill.active {
-  background: var(--color-primary);
+  background: var(--accent, var(--color-primary));
   color: var(--color-on-primary);
-  border-color: var(--color-primary);
+  border-color: transparent;
 }
 
-/* 카테고리 필터 알약 앞의 작은 색상 점 — 알약 배경은 뉴트럴하게 유지하고, 카테고리 구분만 점 하나로 */
-.pill-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  margin-right: 6px;
-  vertical-align: middle;
-  background: var(--accent);
-}
 .badge-list { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin: var(--space-xs) 0; }
 
 /* Comments */
