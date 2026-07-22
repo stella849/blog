@@ -94,6 +94,13 @@ h1, h2, h3 {
   margin: 0 0 var(--space-md);
 }
 h1 { font-size: var(--text-heading-1-size); letter-spacing: var(--text-heading-1-tracking); line-height: 1.1; }
+
+#page-title {
+  font-size: var(--text-heading-2-size);
+  font-weight: 600;
+  letter-spacing: var(--text-heading-2-tracking);
+  color: var(--color-ink-secondary);
+}
 h2 { font-size: var(--text-heading-2-size); letter-spacing: var(--text-heading-2-tracking); line-height: 1.23; }
 h3 { font-size: var(--text-heading-3-size); letter-spacing: var(--text-heading-3-tracking); line-height: 1.27; }
 
