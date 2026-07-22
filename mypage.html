@@ -62,7 +62,8 @@ async function loadMyPosts() {
     .from("posts")
     .select("id, title, created_at, view_count")
     .eq("user_id", session.user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false });
 
   if (error) {
     el.innerHTML = `<p class="form-error">불러오지 못했습니다: ${escapeHtml(error.message)}</p>`;
